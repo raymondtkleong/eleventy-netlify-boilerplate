@@ -4,6 +4,86 @@ const UglifyJS = require("uglify-es");
 const htmlmin = require("html-minifier");
 const slugify = require("slugify");
 const eleventyNavigationPlugin = require("@11ty/eleventy-navigation");
+const fs = require('fs');
+const path = require('path');
+
+const copyLinkFiles = function (source, target) {
+  if ( ! fs.existsSync(target) ) {
+    fs.mkdirSync(target);
+  }
+
+  const files = fs.readdirSync(`${source}`);
+  files.forEach(file => {
+    fs.copyFileSync(`${source}/${file}`, `${target}/${file}` );
+  });
+}
+
+const processShopifyFiles = function (source, target, domains) {
+
+  if ( ! fs.existsSync(target) ) {
+    fs.mkdirSync(target);
+  }
+
+  // process index.htm
+  const targetFileName = `${target}/index.html`;
+  fs.copyFileSync(`${source}/index.htm`, targetFileName );
+  copyLinkFiles(`${source}/index_files`, `${target}/index_files`);
+  domains.forEach( domain => {
+    replaceStringInFile( targetFileName, domain);
+  });
+
+  // process subfolders
+  const subfolders = ['pages', 'products'];
+  subfolders.forEach(subfolder => {
+    if ( ! fs.existsSync(`${target}/${subfolder}`) ) {
+      fs.mkdirSync(`${target}/${subfolder}`);
+    }
+
+    const files = fs.readdirSync(`${source}/${subfolder}`);
+    files.forEach(file => {
+      console.log('file', file);
+      if (path.extname(file) == ".htm") {
+        const sourceFilename = `${source}/${subfolder}/${file}`;
+        const targetFilePath = `${target}/${subfolder}/${path.parse(file).name}`;
+        const targetFileName = `${targetFilePath}/index.html`;
+        if ( ! fs.existsSync(targetFilePath) ) {
+          fs.mkdirSync(targetFilePath);
+        }
+        fs.copyFileSync(sourceFilename, targetFileName );
+        copyLinkFiles(`${source}/${subfolder}/${path.parse(file).name}_files`, targetFilePath);
+        domains.forEach( domain => {
+          replaceStringInFile( targetFileName, domain, path.parse(file).name);
+        });
+      } 
+    })
+  });
+}
+
+const  replaceAll = function (str, find, replace) {
+  return str.replace(new RegExp(find, 'g'), replace);
+}
+
+const replaceStringInFile = function (filename, domain, filenameOnly) {
+  console.log('replaceStringInFile', filename);
+  let data = fs.readFileSync(filename, 'utf8')
+
+  // var rxDomain = /https:\/\/care.omieo.co\/(pages|products)\/([^\s]+)/gmi;
+  // data = data.replace(rxDomain, (match) => {
+  //   var result = match.replace("https:\/\/care.omieo.co\/","/");
+  //   if ( result.substr(result.length -1, 1) === '"' ) {
+  //     result = result.substr(0, result.length -1 ) + ".html";
+  //   }
+  //   console.log('match', match, "=>", result);
+  //   return result;
+  // });
+  data = replaceAll(data, `https://${domain}/products/`, `/products/`);
+  data = replaceAll(data, `https://${domain}/pages/`, `/pages/`);
+  console.log('_files', `${filenameOnly}_files`);
+  data = replaceAll(data, `./${filenameOnly}_files/`, './');
+
+  fs.writeFileSync(filename, data);
+
+}
 
 module.exports = function(eleventyConfig) {
 
@@ -70,7 +150,10 @@ module.exports = function(eleventyConfig) {
   // Don't process folders with static assets e.g. images
   eleventyConfig.addPassthroughCopy("favicon.ico");
   //eleventyConfig.addPassthroughCopy("static/img");
-  eleventyConfig.addPassthroughCopy("static/");
+  //eleventyConfig.addPassthroughCopy("static/");
+
+  processShopifyFiles("shopify", "_site", ['care.omieo.co','3dmf.myshopify.com']);
+
   eleventyConfig.addPassthroughCopy("admin");
   eleventyConfig.addPassthroughCopy("_includes/assets/");
 
@@ -97,13 +180,13 @@ module.exports = function(eleventyConfig) {
     // Leading or trailing slashes are all normalized away, so don’t worry about it.
     // If you don’t have a subdirectory, use "" or "/" (they do the same thing)
     // This is only used for URLs (it does not affect your file structure)
-    pathPrefix: "/",
+    pathPrefix: "/static/",
 
     markdownTemplateEngine: "liquid",
     htmlTemplateEngine: "njk",
     dataTemplateEngine: "njk",
     dir: {
-      input: ".",
+      input: "./static/",
       includes: "_includes",
       data: "_data",
       output: "_site"
