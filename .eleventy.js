@@ -29,7 +29,7 @@ const processShopifyFiles = function (source, target, domains) {
   fs.copyFileSync(`${source}/index.htm`, targetFileName );
   copyLinkFiles(`${source}/index_files`, `${target}/index_files`);
   domains.forEach( domain => {
-    replaceStringInFile( targetFileName, domain);
+    replaceStringInFile( targetFileName, domain, 'index');
   });
 
   // process subfolders
@@ -64,7 +64,7 @@ const  replaceAll = function (str, find, replace) {
 }
 
 const replaceStringInFile = function (filename, domain, filenameOnly) {
-  console.log('replaceStringInFile', filename);
+  console.log('replaceStringInFile', filename, domain, filenameOnly);
   let data = fs.readFileSync(filename, 'utf8')
 
   // var rxDomain = /https:\/\/care.omieo.co\/(pages|products)\/([^\s]+)/gmi;
@@ -76,10 +76,36 @@ const replaceStringInFile = function (filename, domain, filenameOnly) {
   //   console.log('match', match, "=>", result);
   //   return result;
   // });
+
+  const fontTenorSan= "<link href='https://fonts.googleapis.com/css?family=Tenor Sans' rel='stylesheet'></link>";
+  const fontNunitoSans = "<link href='https://fonts.googleapis.com/css?family=Nunito Sans' rel='stylesheet'>";
+  const customCss = `<style type="text/css">
+    .Footer__Newsletter .Form__Input { 
+      background: white; 
+    }
+    .Footer__Newsletter .Form__Submit { 
+      border: 1px white solid; 
+    }
+    .Footer__Newsletter .Form__Submit &:hover {
+      color: white;
+      font-weight: 600;
+    }
+                        
+    .Footer__ThemeAuthor {
+      display: none;
+    }
+  </style>`;
+
+  data = data.replace (`</title>`, `</title>\n${fontTenorSan}\n${fontNunitoSans}`);
+  data = data.replace (`</head>`, `\n${customCss}\n</head>`);
+
   data = replaceAll(data, `https://${domain}/products/`, `/products/`);
   data = replaceAll(data, `https://${domain}/pages/`, `/pages/`);
   console.log('_files', `${filenameOnly}_files`);
-  data = replaceAll(data, `./${filenameOnly}_files/`, './');
+  if ( filenameOnly !== 'index') {
+    data = replaceAll(data, `./${filenameOnly}_files/`, './');
+  }
+  data = replaceAll(data, `https://${domain}/`, `/`);
 
   fs.writeFileSync(filename, data);
 
@@ -152,7 +178,7 @@ module.exports = function(eleventyConfig) {
   //eleventyConfig.addPassthroughCopy("static/img");
   //eleventyConfig.addPassthroughCopy("static/");
 
-  processShopifyFiles("shopify", "_site", ['care.omieo.co','3dmf.myshopify.com']);
+  processShopifyFiles("shopify", "_site", ['store.omieo.co','3dmf.myshopify.com']);
 
   eleventyConfig.addPassthroughCopy("admin");
   eleventyConfig.addPassthroughCopy("_includes/assets/");
